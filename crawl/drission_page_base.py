@@ -1,6 +1,8 @@
 import random
 
 from DrissionPage import WebPage, ChromiumOptions
+from DrissionPage._elements.chromium_element import ChromiumElement
+from DrissionPage._pages.chromium_tab import ChromiumTab
 from random_user_agent.params import SoftwareName, OperatingSystem
 from random_user_agent.user_agent import UserAgent
 
@@ -99,3 +101,49 @@ class DrissionPageBase(object):
 
     def set_mode(self, mode: str, go: bool = True):
         self.page.change_mode(mode, go=go)
+
+    def enable_mobile_mode(self):
+        mobile_emulation = {
+            "width": 411,  # Viewport width
+            "height": 731,  # Viewport height
+            "deviceScaleFactor": 2.625,  # Pixel ratio
+            "mobile": True,  # Enable mobile events (touch, etc.)
+            "screenOrientation": {"angle": 0, "type": "portraitPrimary"}  # Optional: Orientation
+        }
+        self.page.run_cdp("Emulation.setDeviceMetricsOverride", **mobile_emulation)
+
+        # Set mobile user agent
+        ua = {
+            "userAgent": "Mozilla/5.0 (Linux; Android 8.0.0; Pixel Build/OPR3.170623.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.68 Mobile Safari/537.36",
+            "platform": "Android"  # Optional
+        }
+        self.page.run_cdp("Emulation.setUserAgentOverride", **ua)
+        
+    def touch_tap(self, tab: ChromiumTab, element: ChromiumElement) -> None:
+        # Ensure element is in view (optional but recommended for mobile scrolling)
+        element.scroll.to_see()
+
+        # Get element's viewport rectangle
+        bounding_rect = element.run_js('return this.getBoundingClientRect();')
+
+        # Calculate center coordinates
+        center_x = bounding_rect['x'] + (bounding_rect['width'] / 2)
+        center_y = bounding_rect['y'] + (bounding_rect['height'] / 2)
+
+        # Define touch point for a basic tap
+        touch_point = {
+            'x': center_x,
+            'y': center_y,
+            'id': 0,  # Unique touch identifier
+            'radiusX': 1,  # Simulated finger radius
+            'radiusY': 1,
+            'force': 1  # Touch pressure (0-1)
+        }
+
+        # Simulate finger down (touchStart)
+        tab.run_cdp('Input.dispatchTouchEvent', type='touchStart', touchPoints=[touch_point])
+
+        self.sleep_for_seconds(0.1)
+
+        # Simulate finger up (touchEnd) - instant tap, add time.sleep(0.1) if a press is needed
+        tab.run_cdp('Input.dispatchTouchEvent', type='touchEnd', touchPoints=[touch_point])
